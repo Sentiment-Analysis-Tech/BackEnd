@@ -203,7 +203,7 @@ router.get('/analyze/:videoId', async (req, res) => {
         console.log('Combined comments:', combinedComments);
 
         // Send combined comments to the Python server for predictions
-        const pyResponse = await axios.post('http://192.168.1.12:5000/predict', { text: combinedComments });
+        const pyResponse = await axios.post('http://127.0.0.1:5000/predict', { text: combinedComments });
         const prediction = pyResponse.data.prediction;
 
         console.log('Received prediction:', prediction);
