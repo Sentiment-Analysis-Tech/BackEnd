@@ -175,19 +175,22 @@ router.get('/analyze/:videoId', async (req, res) => {
             id: videoId
         });
 
+        console.log("Elasticsearch response:", esResponse);
+
         if (!esResponse.found) {
             console.log("Document not found for videoId:", videoId);
             return res.status(404).json({ error: 'Document not found' });
         }
 
         const comments = extractComments(esResponse);
-        if (comments.length === 0) {
+        console.log("Extracted comments:", comments);
+
+        if (!comments || comments.length === 0) {
             console.log("No valid comments extracted.");
             return res.status(404).json({ error: 'No valid comments extracted' });
         }
 
         console.log(`Comments extracted for videoId: ${videoId}: ${comments.length} comments found`);
-        console.log('Extracted comments:', comments);
 
         // Combine comments into a single paragraph
         const combinedComments = comments.join(' ');
@@ -236,7 +239,7 @@ router.get('/analyze/keyword/:keyword', async (req, res) => {
             return res.status(404).json({ error: 'No comments found containing the keyword' });
         }
 
-        const comments = hits.flatMap(hit => extractComments(hit, keyword));
+        const comments = hits.flatMap(hit => extractKeyword(hit, keyword));
         if (comments.length === 0) {
             console.log("No valid comments extracted.");
             return res.status(404).json({ error: 'No valid comments extracted' });
@@ -262,7 +265,18 @@ router.get('/analyze/keyword/:keyword', async (req, res) => {
     }
 });
 
-function extractComments(hit, keyword) {
+function extractComments(response) {
+    if (!response._source || !response._source.comments) {
+        console.log("No comments found in the response.");
+        return [];
+    }
+
+    return response._source.comments.map(comment =>
+        comment.snippet.topLevelComment.snippet.textDisplay
+    ).filter(Boolean);
+}
+
+function extractKeyword(hit, keyword) {
     if (!hit._source || !hit._source.comments) {
         console.log("No comments found in the response.");
         return [];
