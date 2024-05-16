@@ -5,12 +5,14 @@ const { spawn } = require('child_process');
 const axios = require('axios'); // Make sure to import axios
 
 
-//Videos GET methods
+
+// Videos GET method for retrieving document IDs only
 router.get('/videos', async (req, res) => {
     try {
         const body = await req.elasticClient.search({
             index: process.env.ELASTICSEARCH_MAIN_INDEX,
             size: 1000,
+            _source: false, // Do not retrieve the document source
             body: {
                 query: {
                     match_all: {}
@@ -19,15 +21,16 @@ router.get('/videos', async (req, res) => {
         });
 
         if (body.hits && body.hits.hits) {
-            res.json(body.hits.hits.map(hit => hit._source));
+            res.json(body.hits.hits.map(hit => hit._id));
         } else {
             throw new Error('Invalid response structure from Elasticsearch');
         }
     } catch (error) {
-        console.error('Error retrieving videos:', error);
-        res.status(500).json({ error: 'Error retrieving videos' });
+        console.error('Error retrieving video IDs:', error);
+        res.status(500).json({ error: 'Error retrieving video IDs' });
     }
 });
+
 
 
 router.get('/videos/:videoId', async (req, res) => {
