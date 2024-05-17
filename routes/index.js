@@ -7,8 +7,7 @@ const axios = require('axios'); // Make sure to import axios
 
 
 
-// Videos GET method for retrieving all fields except comments
-// Videos GET method for retrieving all fields except comments
+
 router.get('/videos', async (req, res) => {
     try {
         const body = await req.elasticClient.search({
