@@ -40,6 +40,7 @@ async function run() {
       cors({
         origin: function (origin, callback) {
           const allowedOrigins = [
+            "http://localhost:3000",
             "http://localhost:9000",
             "http://youtubeanalysistech.com",
             "http://www.youtubeanalysistech.com",
