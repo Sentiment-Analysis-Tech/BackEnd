@@ -202,7 +202,7 @@ router.get('/analyze/:videoId', async (req, res) => {
         console.log('Combined comments:', combinedComments);
 
         // Send combined comments to the Python server for predictions
-        const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict/predict', { text: combinedComments });
+        const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
         const prediction = pyResponse.data.prediction;
 
         console.log('Received prediction:', prediction);
@@ -258,7 +258,7 @@ router.get('/analyze/keyword/:keyword', async (req, res) => {
         console.log('Combined comments:', combinedComments);
 
         // Send combined comments to the Python server for predictions
-        const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict/predict', { text: combinedComments });
+        const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
         const prediction = pyResponse.data.prediction;
 
         console.log('Received prediction:', prediction);
