@@ -2,9 +2,13 @@ require('dotenv').config();
 const express = require('express');
 const router = express.Router();
 const { spawn } = require('child_process');
+const { google } = require('googleapis');
 const axios = require('axios'); // Make sure to import axios
 
-
+const youtube = google.youtube({
+    version: 'v3',
+    auth: process.env.YOUTUBE_API_KEY
+});
 
 
 
@@ -214,6 +218,37 @@ router.get('/analyze/:videoId', async (req, res) => {
     }
 });
 
+router.get('/analyze/customVideo/:videoId', async (req, res) => {
+    const { videoId } = req.params;
+
+    try {
+        console.log(`Fetching comments for videoId: ${videoId}`);
+
+        // Fetch comments from YouTube
+        const comments = await fetchYouTubeComments(videoId);
+
+        if (!comments.length) {
+            return res.status(404).json({ error: 'No comments found for this video' });
+        }
+
+        console.log(`Fetched ${comments.length} comments for videoId: ${videoId}`);
+
+        // Combine comments into a single paragraph
+        const combinedComments = comments.join(' ');
+
+        // Send combined comments to the Flask server for predictions
+        const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+        const prediction = pyResponse.data.prediction;
+
+        console.log('Received prediction from Flask server:', prediction);
+
+        return res.json({ videoId, prediction });
+    } catch (error) {
+        console.error('Error processing the request:', error);
+        return res.status(500).json({ error: 'Error processing the request' });
+    }
+});
+
 router.get('/analyze/keyword/:keyword', async (req, res) => {
     const { keyword } = req.params;
 
@@ -270,6 +305,7 @@ router.get('/analyze/keyword/:keyword', async (req, res) => {
     }
 });
 
+
 function extractComments(response) {
     if (!response._source || !response._source.comments) {
         console.log("No comments found in the response.");
@@ -290,6 +326,29 @@ function extractKeyword(hit, keyword) {
     return hit._source.comments
         .map(comment => comment.snippet.topLevelComment.snippet.textDisplay)
         .filter(commentText => commentText.includes(keyword));
+}
+
+async function fetchYouTubeComments(videoId) {
+    let comments = [];
+    let nextPageToken = '';
+    try {
+        do {
+            const response = await youtube.commentThreads.list({
+                part: 'snippet',
+                videoId: videoId,
+                maxResults: 100, // Adjust this as needed
+                pageToken: nextPageToken
+            });
+
+            comments = comments.concat(response.data.items.map(item => item.snippet.topLevelComment.snippet.textDisplay));
+            nextPageToken = response.data.nextPageToken;
+        } while (nextPageToken);
+
+        return comments;
+    } catch (error) {
+        console.error('Error fetching comments from YouTube:', error);
+        throw error;
+    }
 }
 
 module.exports = router;
