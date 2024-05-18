@@ -345,6 +345,47 @@ router.get('/analyze/:videoId/commentsBefore/:date', async (req, res) => {
     }
 });
 
+router.get('/analyze/:videoId/commentsAfter/:date', async (req, res) => {
+    try {
+        const { videoId, date } = req.params;
+
+        const [day, month, year] = date.split('-');
+        const formattedDate = `${year}-${month}-${day}T00:00:00.000Z`;
+
+        const response = await req.elasticClient.get({
+            index: process.env.ELASTICSEARCH_MAIN_INDEX,
+            id: videoId
+        });
+
+        if (response.found) {
+            const comments = response._source.comments.filter(comment => 
+                new Date(comment.snippet.topLevelComment.snippet.publishedAt) > new Date(formattedDate)
+            );
+
+            comments.forEach(comment => {
+                console.log("Comment Date:", comment.snippet.topLevelComment.snippet.publishedAt);
+            });
+
+            if (comments.length > 0) {
+                const combinedComments = comments.map(comment => comment.snippet.topLevelComment.snippet.textDisplay).join(' ');
+
+                const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+                const prediction = pyResponse.data.prediction;
+
+                res.json({ videoId, prediction });
+            } else {
+                res.status(404).json({ error: 'No comments found after this date' });
+            }
+        } else {
+            res.status(404).json({ error: 'No document found for this videoId' });
+        }
+    } catch (error) {
+        console.error('Error retrieving comments:', error);
+        res.status(500).json({ error: 'Error retrieving comments' });
+    }
+});
+
+
 
 
 
