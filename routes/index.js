@@ -171,7 +171,7 @@ router.post('/videos', async (req, res) => {
     }
 });
 
-
+//Analyze methods
 router.get('/analyze/:videoId', async (req, res) => {
     const { videoId } = req.params;
 
@@ -312,25 +312,19 @@ router.get('/analyze/:videoId/commentsBefore/:date', async (req, res) => {
         const [day, month, year] = date.split('-');
         const formattedDate = `${year}-${month}-${day}T00:00:00.000Z`;
 
-        const response = await req.elasticClient.search({
+        const response = await req.elasticClient.get({
             index: process.env.ELASTICSEARCH_MAIN_INDEX,
-            body: {
-                query: {
-                    bool: {
-                        must: [
-                            { term: { "videoId.keyword": videoId } },
-                            { range: { "comments.snippet.topLevelComment.snippet.publishedAt": { lt: formattedDate } } }
-                        ]
-                    }
-                }
-            }
+            id: videoId
         });
 
-        const hits = response.hits.hits;
+        if (response.found) {
+            const comments = response._source.comments.filter(comment => 
+                new Date(comment.snippet.topLevelComment.snippet.publishedAt) < new Date(formattedDate)
+            );
 
-        if (hits.length > 0) {
-            const comments = hits.flatMap(hit => hit._source.comments)
-                                  .filter(comment => new Date(comment.snippet.topLevelComment.snippet.publishedAt) < new Date(formattedDate));
+            comments.forEach(comment => {
+                console.log("Comment Date:", comment.snippet.topLevelComment.snippet.publishedAt);
+            });
 
             if (comments.length > 0) {
                 const combinedComments = comments.map(comment => comment.snippet.topLevelComment.snippet.textDisplay).join(' ');
@@ -343,13 +337,15 @@ router.get('/analyze/:videoId/commentsBefore/:date', async (req, res) => {
                 res.status(404).json({ error: 'No comments found before this date' });
             }
         } else {
-            res.status(404).json({ error: 'No comments found for this videoId before the specified date' });
+            res.status(404).json({ error: 'No document found for this videoId' });
         }
     } catch (error) {
         console.error('Error retrieving comments:', error);
         res.status(500).json({ error: 'Error retrieving comments' });
     }
 });
+
+
 
 
 
