@@ -312,19 +312,25 @@ router.get('/analyze/:videoId/commentsBefore/:date', async (req, res) => {
         const [day, month, year] = date.split('-');
         const formattedDate = `${year}-${month}-${day}T00:00:00.000Z`;
 
-        const response = await req.elasticClient.get({
+        const response = await req.elasticClient.search({
             index: process.env.ELASTICSEARCH_MAIN_INDEX,
-            id: videoId
+            body: {
+                query: {
+                    bool: {
+                        must: [
+                            { term: { "videoId.keyword": videoId } },
+                            { range: { "comments.snippet.topLevelComment.snippet.publishedAt": { lt: formattedDate } } }
+                        ]
+                    }
+                }
+            }
         });
 
-        if (response.found) {
-            const comments = response._source.comments.filter(comment => 
-                new Date(comment.snippet.topLevelComment.snippet.publishedAt) < new Date(formattedDate)
-            );
+        const hits = response.hits.hits;
 
-            comments.forEach(comment => {
-                console.log("Comment Date:", comment.snippet.topLevelComment.snippet.publishedAt);
-            });
+        if (hits.length > 0) {
+            const comments = hits.flatMap(hit => hit._source.comments)
+                                  .filter(comment => new Date(comment.snippet.topLevelComment.snippet.publishedAt) < new Date(formattedDate));
 
             if (comments.length > 0) {
                 const combinedComments = comments.map(comment => comment.snippet.topLevelComment.snippet.textDisplay).join(' ');
@@ -337,13 +343,18 @@ router.get('/analyze/:videoId/commentsBefore/:date', async (req, res) => {
                 res.status(404).json({ error: 'No comments found before this date' });
             }
         } else {
-            res.status(404).json({ error: 'No document found for this videoId' });
+            res.status(404).json({ error: 'No comments found for this videoId before the specified date' });
         }
     } catch (error) {
         console.error('Error retrieving comments:', error);
         res.status(500).json({ error: 'Error retrieving comments' });
     }
 });
+
+
+
+
+
 
 function extractComments(response) {
     if (!response._source || !response._source.comments) {
