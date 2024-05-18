@@ -429,6 +429,114 @@ router.get('/analyze/:videoId/commentsBetween/:startDate/:endDate', async (req, 
 });
 
 
+router.get('/analyze/customVideoAfter/:videoId/:date', async (req, res) => {
+    try {
+        const { videoId, date } = req.params;
+
+        const [day, month, year] = date.split('-');
+        const formattedDate = `${year}-${month}-${day}T00:00:00.000Z`;
+
+        console.log(`Fetching comments for videoId: ${videoId}`);
+
+        const comments = await fetchYouTubeCommentsWithDate(videoId);
+
+        const filteredComments = comments.filter(comment => new Date(comment.publishedAt) > new Date(formattedDate));
+
+        console.log(`Comments after ${formattedDate}: ${filteredComments.length}`);
+        
+       
+
+        if (filteredComments.length > 0) {
+            const combinedComments = filteredComments.map(comment => comment.textDisplay).join(' ');
+
+            const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+            const prediction = pyResponse.data.prediction;
+
+            res.json({ videoId, prediction });
+        } else {
+            res.status(404).json({ error: 'No comments found after this date' });
+        }
+    } catch (error) {
+        console.error('Error retrieving comments:', error);
+        res.status(500).json({ error: 'Error retrieving comments' });
+    }
+});
+
+
+// CustomVideoBefore endpoint
+router.get('/analyze/customVideoBefore/:videoId/:date', async (req, res) => {
+    try {
+        const { videoId, date } = req.params;
+
+        const [day, month, year] = date.split('-');
+        const formattedDate = `${year}-${month}-${day}T00:00:00.000Z`;
+
+        console.log(`Fetching comments for videoId: ${videoId} before ${formattedDate}`);
+
+        const comments = await fetchYouTubeCommentsWithDate(videoId);
+
+        const filteredComments = comments.filter(comment => new Date(comment.publishedAt) < new Date(formattedDate));
+        
+       
+
+        if (filteredComments.length === 0) {
+            return res.status(404).json({ error: 'No comments found before this date' });
+        }
+
+        console.log(`Fetched ${filteredComments.length} comments before ${formattedDate}`);
+
+        const combinedComments = filteredComments.map(comment => comment.textDisplay).join(' ');
+
+        const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+        const prediction = pyResponse.data.prediction;
+
+        res.json({ videoId, prediction });
+    } catch (error) {
+        console.error('Error processing the request:', error);
+        res.status(500).json({ error: 'Error processing the request' });
+    }
+});
+
+// CustomVideoBetween endpoint
+router.get('/analyze/customVideoBetween/:videoId/:startDate/:endDate', async (req, res) => {
+    try {
+        const { videoId, startDate, endDate } = req.params;
+
+        const [startDay, startMonth, startYear] = startDate.split('-');
+        const [endDay, endMonth, endYear] = endDate.split('-');
+        const formattedStartDate = `${startYear}-${startMonth}-${startDay}T00:00:00.000Z`;
+        const formattedEndDate = `${endYear}-${endMonth}-${endDay}T00:00:00.000Z`;
+
+        console.log(`Fetching comments for videoId: ${videoId} between ${formattedStartDate} and ${formattedEndDate}`);
+
+        const comments = await fetchYouTubeCommentsWithDate(videoId);
+
+        const filteredComments = comments.filter(comment => {
+            const commentDate = new Date(comment.publishedAt);
+            return commentDate >= new Date(formattedStartDate) && commentDate <= new Date(formattedEndDate);
+        });
+        
+        if (filteredComments.length === 0) {
+            return res.status(404).json({ error: 'No comments found between these dates' });
+        }
+
+        
+
+        console.log(`Fetched ${filteredComments.length} comments between ${formattedStartDate} and ${formattedEndDate}`);
+       
+        const combinedComments = filteredComments.map(comment => comment.textDisplay).join(' ');
+
+        const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+        const prediction = pyResponse.data.prediction;
+
+        res.json({ videoId, prediction });
+    } catch (error) {
+        console.error('Error processing the request:', error);
+        res.status(500).json({ error: 'Error processing the request' });
+    }
+});
+
+
 
 
 
@@ -470,6 +578,29 @@ async function fetchYouTubeComments(videoId) {
             });
 
             comments = comments.concat(response.data.items.map(item => item.snippet.topLevelComment.snippet.textDisplay));
+            nextPageToken = response.data.nextPageToken;
+        } while (nextPageToken);
+
+        return comments;
+    } catch (error) {
+        console.error('Error fetching comments from YouTube:', error);
+        throw error;
+    }
+}
+
+async function fetchYouTubeCommentsWithDate(videoId) {
+    let comments = [];
+    let nextPageToken = '';
+    try {
+        do {
+            const response = await youtube.commentThreads.list({
+                part: 'snippet',
+                videoId: videoId,
+                maxResults: 100, // Adjust this as needed
+                pageToken: nextPageToken
+            });
+
+            comments = comments.concat(response.data.items.map(item => item.snippet.topLevelComment.snippet));
             nextPageToken = response.data.nextPageToken;
         } while (nextPageToken);
 
