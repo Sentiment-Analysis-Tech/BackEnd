@@ -385,6 +385,48 @@ router.get('/analyze/:videoId/commentsAfter/:date', async (req, res) => {
     }
 });
 
+router.get('/analyze/:videoId/commentsBetween/:startDate/:endDate', async (req, res) => {
+    try {
+        const { videoId, startDate, endDate } = req.params;
+
+        const [startDay, startMonth, startYear] = startDate.split('-');
+        const [endDay, endMonth, endYear] = endDate.split('-');
+        const formattedStartDate = `${startYear}-${startMonth}-${startDay}T00:00:00.000Z`;
+        const formattedEndDate = `${endYear}-${endMonth}-${endDay}T00:00:00.000Z`;
+
+        const response = await req.elasticClient.get({
+            index: process.env.ELASTICSEARCH_MAIN_INDEX,
+            id: videoId
+        });
+
+        if (response.found) {
+            const comments = response._source.comments.filter(comment => {
+                const commentDate = new Date(comment.snippet.topLevelComment.snippet.publishedAt);
+                return commentDate >= new Date(formattedStartDate) && commentDate <= new Date(formattedEndDate);
+            });
+
+            comments.forEach(comment => {
+                console.log("Comment Date:", comment.snippet.topLevelComment.snippet.publishedAt);
+            });
+
+            if (comments.length > 0) {
+                const combinedComments = comments.map(comment => comment.snippet.topLevelComment.snippet.textDisplay).join(' ');
+
+                const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+                const prediction = pyResponse.data.prediction;
+
+                res.json({ videoId, prediction });
+            } else {
+                res.status(404).json({ error: 'No comments found between these dates' });
+            }
+        } else {
+            res.status(404).json({ error: 'No document found for this videoId' });
+        }
+    } catch (error) {
+        console.error('Error retrieving comments:', error);
+        res.status(500).json({ error: 'Error retrieving comments' });
+    }
+});
 
 
 
