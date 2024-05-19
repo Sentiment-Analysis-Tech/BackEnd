@@ -37,8 +37,6 @@ router.get('/videos', async (req, res) => {
     }
 });
 
-
-
 router.get('/videos/:videoId', async (req, res) => {
     try {
         const { videoId } = req.params;
@@ -535,13 +533,6 @@ router.get('/analyze/customVideoBetween/:videoId/:startDate/:endDate', async (re
         res.status(500).json({ error: 'Error processing the request' });
     }
 });
-
-
-
-
-
-
-
 
 function extractComments(response) {
     if (!response._source || !response._source.comments) {

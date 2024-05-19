@@ -2,7 +2,9 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
-const elasticsearch = require('elasticsearch');
+const elasticsearch = require("elasticsearch");
+const admin = require("firebase-admin");
+const cron = require("node-cron");
 const router = require("./routes");
 
 const app = express();
@@ -26,8 +28,59 @@ elasticClient.ping(
   }
 );
 
+// Firebase Admin SDK'yı başlatın
+const serviceAccount = require("./serviceAccountKey.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://sentimentanalysistech.firebaseio.com",
+});
+
+const db = admin.firestore();
+
 app.set("trust proxy", true);
 console.log("Express is configured to trust the 'X-Forwarded-For' header");
+
+// Her dakika kredi güncelleme cron job
+cron.schedule("* * * * *", async () => {
+  try {
+    const usersSnapshot = await db.collection("users").get();
+    usersSnapshot.forEach(async (userDoc) => {
+      const userData = userDoc.data();
+      if (userData.credits < 10) {
+        await userDoc.ref.update({
+          credits: admin.firestore.FieldValue.increment(1),
+        });
+        
+        if (userData.deviceToken) {
+          sendNotification(userData.deviceToken, userData.credits + 1);
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Error updating credits: ", error);
+  }
+});
+
+function sendNotification(deviceToken, newCredits) {
+  const message = {
+    notification: {
+      title: "Credits Updated",
+      body: `Your credits have been updated to ${newCredits}`,
+    },
+    token: deviceToken,
+  };
+
+  admin
+    .messaging()
+    .send(message)
+    .then((response) => {
+      console.log("Successfully sent message:", response);
+    })
+    .catch((error) => {
+      console.log("Error sending message:", error);
+    });
+}
 
 async function run() {
   try {
