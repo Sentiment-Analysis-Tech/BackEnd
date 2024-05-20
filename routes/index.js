@@ -5,9 +5,11 @@ const { spawn } = require('child_process');
 const { google } = require('googleapis');
 const axios = require('axios'); // Make sure to import axios
 
+const YOUTUBE_API_KEY = "AIzaSyD-MPVRjHp0qVcgShSyyrD5oRzv_npoOeM";
+
 const youtube = google.youtube({
     version: 'v3',
-    auth: process.env.YOUTUBE_API_KEY
+    auth: YOUTUBE_API_KEY
 });
 
 const MAIN_INDEX = 'analysistech'; // Define the main index
