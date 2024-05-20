@@ -71,6 +71,12 @@ function sendNotification(deviceToken, newCredits) {
     data: {
       newCredits: newCredits.toString(), // Ensure data values are strings
     },
+    android: {
+      notification: {
+        icon: 'ic_launcher', // The name of the icon in the drawable/mipmap folder
+        color: '#FF0000' // Optional: color of the icon
+      }
+    },
     token: deviceToken,
   };
 
@@ -84,6 +90,7 @@ function sendNotification(deviceToken, newCredits) {
       console.error("Error sending message:", error);
     });
 }
+
 
 async function run() {
   try {
