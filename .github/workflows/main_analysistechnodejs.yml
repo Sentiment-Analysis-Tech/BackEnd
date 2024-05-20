@@ -66,4 +66,6 @@ jobs:
           slot-name: 'Production'
           package: .
 
-      # Removed npm start step as Azure Web App will start the server
+      - name: Start the application
+        run: |
+          nohup npm start &
