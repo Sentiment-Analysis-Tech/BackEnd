@@ -18,9 +18,13 @@ jobs:
         with:
           node-version: '18.x'
 
-      - name: npm install and build
+      - name: Install dependencies
         run: |
           npm install
+          npm install nodemon  # Directly install nodemon
+
+      - name: Run build and tests
+        run: |
           npm run build --if-present
           npm run test --if-present
 
@@ -68,4 +72,5 @@ jobs:
 
       - name: Start the application
         run: |
-          nohup npm start &
+          npm install nodemon  # Ensure nodemon is installed
+          nohup npm run dev &  # Run nodemon in the background
