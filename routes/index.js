@@ -14,7 +14,7 @@ const youtube = google.youtube({
 
 const MAIN_INDEX = 'analysistech'; // Define the main index
 
-router.get('/videos', async (req, res) => {
+/*router.get('/videos', async (req, res) => {
     try {
         const body = await req.elasticClient.search({
             index: MAIN_INDEX,
@@ -37,7 +37,41 @@ router.get('/videos', async (req, res) => {
         console.error('Error retrieving videos:', error);
         res.status(500).json({ error: 'Error retrieving videos' });
     }
+});*/
+
+router.get('/videos', async (req, res) => {
+    const page = parseInt(req.query.page) || 1; // Default to page 1 if no page query parameter is provided
+    const pageSize = 10; // Number of videos per page
+
+    try {
+        const body = await req.elasticClient.search({
+            index: MAIN_INDEX,
+            size: pageSize,
+            from: (page - 1) * pageSize,
+            _source: ["*"], // Include all fields
+            _source_excludes: ["comments"], // Exclude the comments field
+            body: {
+                query: {
+                    match_all: {}
+                }
+            }
+        });
+
+        if (body.hits && body.hits.hits) {
+            res.json({
+                videos: body.hits.hits.map(hit => hit._source),
+                currentPage: page,
+                totalPages: Math.ceil(body.hits.total.value / pageSize)
+            });
+        } else {
+            throw new Error('Invalid response structure from Elasticsearch');
+        }
+    } catch (error) {
+        console.error('Error retrieving videos:', error);
+        res.status(500).json({ error: 'Error retrieving videos' });
+    }
 });
+
 
 router.get('/videos/:videoId', async (req, res) => {
     try {
