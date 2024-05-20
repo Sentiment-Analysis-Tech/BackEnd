@@ -68,6 +68,9 @@ function sendNotification(deviceToken, newCredits) {
       title: "Credits Updated",
       body: `Your credits have been updated to ${newCredits}`,
     },
+    data: {
+      newCredits: newCredits.toString(), // Ensure data values are strings
+    },
     token: deviceToken,
   };
 
@@ -78,7 +81,7 @@ function sendNotification(deviceToken, newCredits) {
       console.log("Successfully sent message:", response);
     })
     .catch((error) => {
-      console.log("Error sending message:", error);
+      console.error("Error sending message:", error);
     });
 }
 
