@@ -70,6 +70,4 @@ jobs:
           slot-name: 'Production'
           package: .
 
-      - name: Start the application
-        run: |
-          nohup npx nodemon server.js  
+    
