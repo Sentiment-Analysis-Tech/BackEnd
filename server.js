@@ -11,7 +11,7 @@ const app = express();
 const port = process.env.PORT || 8080;
 
 const elasticClient = new elasticsearch.Client({
-  host: process.env.ELASTICSEARCH_URL,
+  host: "https://jpxy5e6kzh:9lrunn5x73@nlp-aybu-5490819764.eu-central-1.bonsaisearch.net:443",
   log: "trace",
 });
 
