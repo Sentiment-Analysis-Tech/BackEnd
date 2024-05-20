@@ -40,16 +40,16 @@ const MAIN_INDEX = 'analysistech'; // Define the main index
 });*/
 
 router.get('/videos', async (req, res) => {
-    const page = parseInt(req.query.page) || 1; // Default to page 1 if no page query parameter is provided
-    const pageSize = 10; // Number of videos per page
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = 10;
 
     try {
         const body = await req.elasticClient.search({
             index: MAIN_INDEX,
             size: pageSize,
             from: (page - 1) * pageSize,
-            _source: ["*"], // Include all fields
-            _source_excludes: ["comments"], // Exclude the comments field
+            _source: ["*"],
+            _source_excludes: ["comments"],
             body: {
                 query: {
                     match_all: {}
@@ -61,7 +61,8 @@ router.get('/videos', async (req, res) => {
             res.json({
                 videos: body.hits.hits.map(hit => hit._source),
                 currentPage: page,
-                totalPages: Math.ceil(body.hits.total.value / pageSize)
+                totalPages: Math.ceil(body.hits.total.value / pageSize),
+                totalDataCount: body.hits.total.value // Include total count
             });
         } else {
             throw new Error('Invalid response structure from Elasticsearch');
