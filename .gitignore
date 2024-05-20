@@ -23,7 +23,6 @@ logs
 *.pid.lock
 
 # Optional - Configuration files that may contain sensitive information
-.env
 
 /venv
 
