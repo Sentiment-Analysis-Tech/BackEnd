@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          npm install nodemon  # Directly install nodemon
+          npm install --save-dev nodemon
 
       - name: Run build and tests
         run: |
@@ -72,5 +72,4 @@ jobs:
 
       - name: Start the application
         run: |
-          npm install nodemon  # Ensure nodemon is installed
-          nohup npm run dev &  # Run nodemon in the background
+          nohup npx nodemon server.js  
