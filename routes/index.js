@@ -10,12 +10,12 @@ const youtube = google.youtube({
     auth: process.env.YOUTUBE_API_KEY
 });
 
-
+const MAIN_INDEX = 'analysistech'; // Define the main index
 
 router.get('/videos', async (req, res) => {
     try {
         const body = await req.elasticClient.search({
-            index: process.env.ELASTICSEARCH_MAIN_INDEX,
+            index: MAIN_INDEX,
             size: 1000,
             _source: ["*"], // Include all fields
             _source_excludes: ["comments"], // Exclude the comments field
@@ -41,7 +41,7 @@ router.get('/videos/:videoId', async (req, res) => {
     try {
         const { videoId } = req.params;
         const videoDocument = await req.elasticClient.get({
-            index: process.env.ELASTICSEARCH_MAIN_INDEX,
+            index: MAIN_INDEX,
             id: videoId
         });
 
@@ -57,9 +57,8 @@ router.get('/videoCount', async (req, res) => {
 
     try {
         const response = await req.elasticClient.count({
-            index: process.env.ELASTICSEARCH_MAIN_INDEX
+            index: MAIN_INDEX
         });
-
 
         if (response && typeof response.count === 'number') {
             res.json({ count: response.count });
@@ -77,7 +76,7 @@ router.get('/videos/videoCategory/:category', async (req, res) => {
         const { category } = req.params;
 
         const response = await req.elasticClient.search({
-            index: process.env.ELASTICSEARCH_MAIN_INDEX,
+            index: MAIN_INDEX,
             body: {
                 query: {
                     term: {
@@ -107,7 +106,7 @@ router.get('/videos/brands/:brand', async (req, res) => {
         const { selectedBrand } = req.params;
         const brandCategory = 'brand';
         const response = await req.elasticClient.search({
-            index: process.env.ELASTICSEARCH_MAIN_INDEX,
+            index: MAIN_INDEX,
             body: {
                 query: {
                     term: {
@@ -118,7 +117,7 @@ router.get('/videos/brands/:brand', async (req, res) => {
             }
         });
 
-        const hits = response.hits; // hits özelliğine doğru şekilde erişin
+        const hits = response.hits;
 
         if (hits && hits.total.value > 0) {
             res.json(hits.hits.map(hit => hit._source));
@@ -132,12 +131,12 @@ router.get('/videos/brands/:brand', async (req, res) => {
     }
 });
 
-//Videos DELETE methods
+// Videos DELETE methods
 router.delete('/videos/:videoId', async (req, res) => {
     try {
         const { videoId } = req.params;
         const response = await req.elasticClient.delete({
-            index: process.env.ELASTICSEARCH_MAIN_INDEX,
+            index: MAIN_INDEX,
             id: videoId
         });
 
@@ -149,14 +148,14 @@ router.delete('/videos/:videoId', async (req, res) => {
     }
 });
 
-//Videos POST methods
+// Videos POST methods
 router.post('/videos', async (req, res) => {
     try {
         const videoData = req.body;
         console.log(videoData['videoId']);
 
         const response = await req.elasticClient.index({
-            index: process.env.ELASTICSEARCH_MAIN_INDEX,
+            index: MAIN_INDEX,
             body: videoData,
             id: videoData['videoId']
         });
@@ -169,7 +168,7 @@ router.post('/videos', async (req, res) => {
     }
 });
 
-//Analyze methods
+// Analyze methods
 router.get('/analyze/:videoId', async (req, res) => {
     const { videoId } = req.params;
 
@@ -178,7 +177,7 @@ router.get('/analyze/:videoId', async (req, res) => {
     try {
         // Fetch comments from Elasticsearch using videoId
         const esResponse = await req.elasticClient.get({
-            index: process.env.ELASTICSEARCH_MAIN_INDEX, // Ensure this is set correctly in your .env file
+            index: MAIN_INDEX,
             id: videoId
         });
 
@@ -255,7 +254,7 @@ router.get('/analyze/keyword/:keyword', async (req, res) => {
     try {
         // Search for comments containing the keyword across all videos
         const esResponse = await req.elasticClient.search({
-            index: process.env.ELASTICSEARCH_MAIN_INDEX,
+            index: MAIN_INDEX,
             size: 1000, // Adjust size if needed
             body: {
                 query: {
@@ -311,7 +310,7 @@ router.get('/analyze/:videoId/commentsBefore/:date', async (req, res) => {
         const formattedDate = `${year}-${month}-${day}T00:00:00.000Z`;
 
         const response = await req.elasticClient.get({
-            index: process.env.ELASTICSEARCH_MAIN_INDEX,
+            index: MAIN_INDEX,
             id: videoId
         });
 
@@ -351,7 +350,7 @@ router.get('/analyze/:videoId/commentsAfter/:date', async (req, res) => {
         const formattedDate = `${year}-${month}-${day}T00:00:00.000Z`;
 
         const response = await req.elasticClient.get({
-            index: process.env.ELASTICSEARCH_MAIN_INDEX,
+            index: MAIN_INDEX,
             id: videoId
         });
 
@@ -393,7 +392,7 @@ router.get('/analyze/:videoId/commentsBetween/:startDate/:endDate', async (req, 
         const formattedEndDate = `${endYear}-${endMonth}-${endDay}T00:00:00.000Z`;
 
         const response = await req.elasticClient.get({
-            index: process.env.ELASTICSEARCH_MAIN_INDEX,
+            index: MAIN_INDEX,
             id: videoId
         });
 
@@ -426,7 +425,6 @@ router.get('/analyze/:videoId/commentsBetween/:startDate/:endDate', async (req, 
     }
 });
 
-
 router.get('/analyze/customVideoAfter/:videoId/:date', async (req, res) => {
     try {
         const { videoId, date } = req.params;
@@ -442,8 +440,6 @@ router.get('/analyze/customVideoAfter/:videoId/:date', async (req, res) => {
 
         console.log(`Comments after ${formattedDate}: ${filteredComments.length}`);
         
-       
-
         if (filteredComments.length > 0) {
             const combinedComments = filteredComments.map(comment => comment.textDisplay).join(' ');
 
@@ -460,7 +456,6 @@ router.get('/analyze/customVideoAfter/:videoId/:date', async (req, res) => {
     }
 });
 
-
 // CustomVideoBefore endpoint
 router.get('/analyze/customVideoBefore/:videoId/:date', async (req, res) => {
     try {
@@ -475,8 +470,6 @@ router.get('/analyze/customVideoBefore/:videoId/:date', async (req, res) => {
 
         const filteredComments = comments.filter(comment => new Date(comment.publishedAt) < new Date(formattedDate));
         
-       
-
         if (filteredComments.length === 0) {
             return res.status(404).json({ error: 'No comments found before this date' });
         }
@@ -517,8 +510,6 @@ router.get('/analyze/customVideoBetween/:videoId/:startDate/:endDate', async (re
         if (filteredComments.length === 0) {
             return res.status(404).json({ error: 'No comments found between these dates' });
         }
-
-        
 
         console.log(`Fetched ${filteredComments.length} comments between ${formattedStartDate} and ${formattedEndDate}`);
        

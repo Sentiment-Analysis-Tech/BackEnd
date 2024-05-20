@@ -23,6 +23,7 @@ jobs:
           npm install
           npm run build --if-present
           npm run test --if-present
+
       - name: Zip artifact for deployment
         run: zip release.zip ./* -r
 
@@ -49,7 +50,7 @@ jobs:
 
       - name: Unzip artifact for deployment
         run: unzip release.zip
-      
+
       - name: Login to Azure
         uses: azure/login@v1
         with:
@@ -64,9 +65,5 @@ jobs:
           app-name: 'analysistechNodeJs'
           slot-name: 'Production'
           package: .
-          
-      - name: Start the application
-        run: |
-          npm start
-        continue-on-error: true
-        shell: bash
+
+      # Removed npm start step as Azure Web App will start the server
