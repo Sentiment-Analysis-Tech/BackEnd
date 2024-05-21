@@ -72,8 +72,3 @@ jobs:
           app-name: 'analysistechNodeJs'
           slot-name: 'Production'
           package: ./release
-
-      - name: Start server
-        run: |
-          cd release
-          node server.js
