@@ -29,7 +29,7 @@ jobs:
           npm run test --if-present
 
       - name: Zip artifact for deployment
-        run: zip release.zip ./* -r
+        run: zip -r release.zip ./*
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v3
@@ -53,7 +53,10 @@ jobs:
           name: node-app
 
       - name: Unzip artifact for deployment
-        run: unzip release.zip
+        run: unzip release.zip -d release
+
+      - name: Change directory to the unzipped release
+        run: cd release
 
       - name: Login to Azure
         uses: azure/login@v1
@@ -68,6 +71,9 @@ jobs:
         with:
           app-name: 'analysistechNodeJs'
           slot-name: 'Production'
-          package: .
+          package: ./release
 
-    
+      - name: Start server
+        run: |
+          cd /home/site/wwwroot
+          node server.js
