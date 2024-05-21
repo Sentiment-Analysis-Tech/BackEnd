@@ -55,8 +55,8 @@ jobs:
       - name: Unzip artifact for deployment
         run: unzip release.zip -d release
 
-      - name: Change directory to the unzipped release
-        run: cd release
+      - name: List files for debugging
+        run: ls -la release
 
       - name: Login to Azure
         uses: azure/login@v1
@@ -75,5 +75,5 @@ jobs:
 
       - name: Start server
         run: |
-          cd /home/site/wwwroot
+          cd release
           node server.js
