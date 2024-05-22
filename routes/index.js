@@ -14,30 +14,6 @@ const youtube = google.youtube({
 
 const MAIN_INDEX = 'analysistech'; // Define the main index
 
-/*router.get('/videos', async (req, res) => {
-    try {
-        const body = await req.elasticClient.search({
-            index: MAIN_INDEX,
-            size: 1000,
-            _source: ["*"], // Include all fields
-            _source_excludes: ["comments"], // Exclude the comments field
-            body: {
-                query: {
-                    match_all: {}
-                }
-            }
-        });
-
-        if (body.hits && body.hits.hits) {
-            res.json(body.hits.hits.map(hit => hit._source));
-        } else {
-            throw new Error('Invalid response structure from Elasticsearch');
-        }
-    } catch (error) {
-        console.error('Error retrieving videos:', error);
-        res.status(500).json({ error: 'Error retrieving videos' });
-    }
-});*/
 
 router.get('/videos', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
@@ -60,7 +36,7 @@ router.get('/videos', async (req, res) => {
                         ],
                         must_not: [
                             {
-                                term: { "videoCategory": "NaN" }
+                                term: { "videoCategory.keyword": "NaN" }
                             }
                         ]
                     }
@@ -73,7 +49,7 @@ router.get('/videos', async (req, res) => {
                 videos: body.hits.hits.map(hit => hit._source),
                 currentPage: page,
                 totalPages: Math.ceil(body.hits.total.value / pageSize),
-                totalDataCount: body.hits.total.value // Include total count
+                totalDataCount: body.hits.total.value
             });
         } else {
             throw new Error('Invalid response structure from Elasticsearch');
