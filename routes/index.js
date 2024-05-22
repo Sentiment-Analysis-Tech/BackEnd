@@ -52,7 +52,18 @@ router.get('/videos', async (req, res) => {
             _source_excludes: ["comments"],
             body: {
                 query: {
-                    match_all: {}
+                    bool: {
+                        must: [
+                            {
+                                match_all: {}
+                            }
+                        ],
+                        must_not: [
+                            {
+                                term: { "videoCategory": "NaN" }
+                            }
+                        ]
+                    }
                 }
             }
         });
