@@ -14,6 +14,7 @@ const youtube = google.youtube({
 
 const MAIN_INDEX = 'analysistech'; // Define the main index
 
+const flaskUrl = 'https://sentlyzeflask.azurewebsites.net/predict';
 
 router.get('/videos', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
@@ -227,7 +228,7 @@ router.get('/analyze/:videoId', async (req, res) => {
         console.log('Combined comments:', combinedComments);
 
         // Send combined comments to the Python server for predictions
-        const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+        const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
         const prediction = pyResponse.data.prediction;
 
         console.log('Received prediction:', prediction);
@@ -258,7 +259,7 @@ router.get('/analyze/customVideo/:videoId', async (req, res) => {
         const combinedComments = comments.join(' ');
 
         // Send combined comments to the Flask server for predictions
-        const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+        const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
         const prediction = pyResponse.data.prediction;
 
         console.log('Received prediction from Flask server:', prediction);
@@ -314,7 +315,7 @@ router.get('/analyze/keyword/:keyword', async (req, res) => {
         console.log('Combined comments:', combinedComments);
 
         // Send combined comments to the Python server for predictions
-        const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+        const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
         const prediction = pyResponse.data.prediction;
 
         console.log('Received prediction:', prediction);
@@ -350,7 +351,7 @@ router.get('/analyze/:videoId/commentsBefore/:date', async (req, res) => {
             if (comments.length > 0) {
                 const combinedComments = comments.map(comment => comment.snippet.topLevelComment.snippet.textDisplay).join(' ');
 
-                const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+                const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
                 const prediction = pyResponse.data.prediction;
 
                 res.json({ videoId, prediction });
@@ -390,7 +391,7 @@ router.get('/analyze/:videoId/commentsAfter/:date', async (req, res) => {
             if (comments.length > 0) {
                 const combinedComments = comments.map(comment => comment.snippet.topLevelComment.snippet.textDisplay).join(' ');
 
-                const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+                const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
                 const prediction = pyResponse.data.prediction;
 
                 res.json({ videoId, prediction });
@@ -433,7 +434,7 @@ router.get('/analyze/:videoId/commentsBetween/:startDate/:endDate', async (req, 
             if (comments.length > 0) {
                 const combinedComments = comments.map(comment => comment.snippet.topLevelComment.snippet.textDisplay).join(' ');
 
-                const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+                const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
                 const prediction = pyResponse.data.prediction;
 
                 res.json({ videoId, prediction });
@@ -467,7 +468,7 @@ router.get('/analyze/customVideoAfter/:videoId/:date', async (req, res) => {
         if (filteredComments.length > 0) {
             const combinedComments = filteredComments.map(comment => comment.textDisplay).join(' ');
 
-            const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+            const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
             const prediction = pyResponse.data.prediction;
 
             res.json({ videoId, prediction });
@@ -502,7 +503,7 @@ router.get('/analyze/customVideoBefore/:videoId/:date', async (req, res) => {
 
         const combinedComments = filteredComments.map(comment => comment.textDisplay).join(' ');
 
-        const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+        const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
         const prediction = pyResponse.data.prediction;
 
         res.json({ videoId, prediction });
@@ -539,7 +540,7 @@ router.get('/analyze/customVideoBetween/:videoId/:startDate/:endDate', async (re
        
         const combinedComments = filteredComments.map(comment => comment.textDisplay).join(' ');
 
-        const pyResponse = await axios.post('https://analysistechflask.azurewebsites.net/predict', { text: combinedComments });
+        const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
         const prediction = pyResponse.data.prediction;
 
         res.json({ videoId, prediction });
