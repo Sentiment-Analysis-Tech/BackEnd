@@ -42,9 +42,9 @@ app.set("trust proxy", true);
 console.log("Express is configured to trust the 'X-Forwarded-For' header");
 
 // Her dakika kredi güncelleme cron job
-cron.schedule("* * * * *", async () => {
+cron.schedule('0 12 * * *', async () => {
   try {
-    const usersSnapshot = await db.collection("users").get();
+    const usersSnapshot = await db.collection('users').get();
     usersSnapshot.forEach(async (userDoc) => {
       const userData = userDoc.data();
       if (userData.credits < 10) {
@@ -58,7 +58,7 @@ cron.schedule("* * * * *", async () => {
       }
     });
   } catch (error) {
-    console.error("Error updating credits: ", error);
+    console.error('Error updating credits: ', error);
   }
 });
 
