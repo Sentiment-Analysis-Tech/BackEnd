@@ -192,7 +192,6 @@ router.post('/videos', async (req, res) => {
     }
 });
 
-// Analyze methods
 router.get('/analyze/:videoId', async (req, res) => {
     const { videoId } = req.params;
 
@@ -201,11 +200,9 @@ router.get('/analyze/:videoId', async (req, res) => {
     try {
         // Fetch comments from Elasticsearch using videoId
         const esResponse = await req.elasticClient.get({
-            index: MAIN_INDEX,
+            index: process.env.ELASTICSEARCH_MAIN_INDEX, // Ensure this is set correctly in your .env file
             id: videoId
         });
-
-        console.log("Elasticsearch response:", esResponse);
 
         if (!esResponse.found) {
             console.log("Document not found for videoId:", videoId);
@@ -213,26 +210,39 @@ router.get('/analyze/:videoId', async (req, res) => {
         }
 
         const comments = extractComments(esResponse);
-        console.log("Extracted comments:", comments);
-
-        if (!comments || comments.length === 0) {
+        if (comments.length === 0) {
             console.log("No valid comments extracted.");
             return res.status(404).json({ error: 'No valid comments extracted' });
         }
 
         console.log(`Comments extracted for videoId: ${videoId}: ${comments.length} comments found`);
+        console.log('Extracted comments:', comments);
 
-        // Combine comments into a single paragraph
-        const combinedComments = comments.join(' ');
-        console.log('Combined comments:', combinedComments);
+        // Analiz sonuçlarını toplamak için bir array oluştur
+        let predictions = [];
 
-        // Send combined comments to the Python server for predictions
-        const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
-        const prediction = pyResponse.data.prediction;
+        for (const comment of comments) {
+            try {
+                const pyResponse = await axios.post('http://192.168.1.12:5000/predict', { text: comment });
+                predictions.push(pyResponse.data.prediction);
+            } catch (error) {
+                console.error(`Error predicting sentiment for comment: ${comment}`, error);
+            }
+        }
 
-        console.log('Received prediction:', prediction);
+        if (predictions.length === 0) {
+            console.log("No valid predictions obtained.");
+            return res.status(500).json({ error: 'No valid predictions obtained' });
+        }
 
-        return res.json({ videoId, prediction });
+        // Ortalamayı hesapla
+        const averagePrediction = predictions.reduce((a, b) => a + b, 0) / predictions.length;
+        const averageSentiment = averagePrediction > 0.5 ? 'Positive' : 'Negative';
+
+        console.log('Average prediction:', averagePrediction);
+        console.log('Average sentiment:', averageSentiment);
+
+        return res.json({ videoId, prediction: averagePrediction, sentiment: averageSentiment });
     } catch (error) {
         console.error("Error communicating with Elasticsearch or Python server:", error);
         return res.status(500).json({ error: 'Error processing the request' });
