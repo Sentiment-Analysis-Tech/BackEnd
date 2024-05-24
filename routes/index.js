@@ -6,7 +6,6 @@ const { google } = require('googleapis');
 const axios = require('axios'); // Make sure to import axios
 
 const YOUTUBE_API_KEY = "AIzaSyD-MPVRjHp0qVcgShSyyrD5oRzv_npoOeM";
-
 const youtube = google.youtube({
     version: 'v3',
     auth: YOUTUBE_API_KEY
@@ -14,7 +13,7 @@ const youtube = google.youtube({
 
 const MAIN_INDEX = 'analysistech'; // Define the main index
 
-const flaskUrl = 'https://sentlyzeflask.azurewebsites.net/predict';
+const flaskUrl = 'https://flasksentlyze.azurewebsites.net/predict';
 
 router.get('/videos', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
