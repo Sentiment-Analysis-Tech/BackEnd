@@ -218,33 +218,37 @@ router.get('/analyze/:videoId', async (req, res) => {
         console.log(`Comments extracted for videoId: ${videoId}: ${comments.length} comments found`);
         console.log('Extracted comments:', comments);
 
-        // Analiz sonuçlarını toplamak için bir array oluştur
-        let predictions = [];
+        // Send all comments in a single request to the Flask server
+        console.log('Sending comments to Flask server:', { comments });
+        const pyResponse = await axios.post(flaskUrl, { comments });
 
-        for (const comment of comments) {
-            try {
-                const pyResponse = await axios.post('http://192.168.1.12:5000/predict', { text: comment });
-                predictions.push(pyResponse.data.prediction);
-            } catch (error) {
-                console.error(`Error predicting sentiment for comment: ${comment}`, error);
-            }
-        }
-
-        if (predictions.length === 0) {
+        if (!pyResponse.data.predictions) {
             console.log("No valid predictions obtained.");
             return res.status(500).json({ error: 'No valid predictions obtained' });
         }
 
-        // Ortalamayı hesapla
+        // Calculate average prediction and determine sentiment
+        const predictions = pyResponse.data.predictions;
         const averagePrediction = predictions.reduce((a, b) => a + b, 0) / predictions.length;
         const averageSentiment = averagePrediction > 0.5 ? 'Positive' : 'Negative';
 
         console.log('Average prediction:', averagePrediction);
         console.log('Average sentiment:', averageSentiment);
+        console.log('Most frequent word:', pyResponse.data.most_frequent_word);
 
-        return res.json({ videoId, prediction: averagePrediction, sentiment: averageSentiment });
+        return res.json({
+            videoId,
+            prediction: averagePrediction,
+            sentiment: averageSentiment,
+            mostFrequentWord: pyResponse.data.most_frequent_word
+        });
     } catch (error) {
         console.error("Error communicating with Elasticsearch or Python server:", error);
+
+        if (error.response && error.response.data) {
+            console.error("Flask server error response:", error.response.data);
+        }
+
         return res.status(500).json({ error: 'Error processing the request' });
     }
 });
