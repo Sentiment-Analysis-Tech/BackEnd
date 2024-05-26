@@ -13,7 +13,7 @@ const youtube = google.youtube({
 
 const MAIN_INDEX = 'analysistech'; // Define the main index
 
-const flaskUrl = 'https://flasksentlyze.azurewebsites.net/predict';
+const flaskUrl = 'http://127.0.0.1:5000/predict';
 
 router.get('/videos', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
@@ -192,6 +192,7 @@ router.post('/videos', async (req, res) => {
     }
 });
 
+
 router.get('/analyze/:videoId', async (req, res) => {
     const { videoId } = req.params;
 
@@ -200,7 +201,7 @@ router.get('/analyze/:videoId', async (req, res) => {
     try {
         // Fetch comments from Elasticsearch using videoId
         const esResponse = await req.elasticClient.get({
-            index: process.env.ELASTICSEARCH_MAIN_INDEX, // Ensure this is set correctly in your .env file
+            index: MAIN_INDEX, // Ensure this is set correctly in your .env file
             id: videoId
         });
 
@@ -234,13 +235,13 @@ router.get('/analyze/:videoId', async (req, res) => {
 
         console.log('Average prediction:', averagePrediction);
         console.log('Average sentiment:', averageSentiment);
-        console.log('Most frequent word:', pyResponse.data.most_frequent_word);
+        console.log('Most frequent word:', pyResponse.data.most_frequent_words);
 
         return res.json({
             videoId,
             prediction: averagePrediction,
             sentiment: averageSentiment,
-            mostFrequentWord: pyResponse.data.most_frequent_word
+            mostFrequentWord: pyResponse.data.most_frequent_words
         });
     } catch (error) {
         console.error("Error communicating with Elasticsearch or Python server:", error);
@@ -268,21 +269,27 @@ router.get('/analyze/customVideo/:videoId', async (req, res) => {
 
         console.log(`Fetched ${comments.length} comments for videoId: ${videoId}`);
 
-        // Combine comments into a single paragraph
-        const combinedComments = comments.join(' ');
+        // Send comments array to the Flask server for predictions
+        const pyResponse = await axios.post(flaskUrl, { comments });
+        const predictions = pyResponse.data.predictions;
+        const averagePrediction = predictions.reduce((a, b) => a + b, 0) / predictions.length;
+        const averageSentiment = averagePrediction > 0.5 ? 'Positive' : 'Negative';
 
-        // Send combined comments to the Flask server for predictions
-        const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
-        const prediction = pyResponse.data.prediction;
 
-        console.log('Received prediction from Flask server:', prediction);
 
-        return res.json({ videoId, prediction });
+        return res.json({
+            videoId,
+            prediction: averagePrediction,
+            sentiment: averageSentiment,
+            mostFrequentWord: pyResponse.data.most_frequent_words
+        });
     } catch (error) {
         console.error('Error processing the request:', error);
         return res.status(500).json({ error: 'Error processing the request' });
     }
 });
+
+
 
 router.get('/analyze/keyword/:keyword', async (req, res) => {
     const { keyword } = req.params;
@@ -323,22 +330,37 @@ router.get('/analyze/keyword/:keyword', async (req, res) => {
         console.log(`Comments extracted containing the keyword: ${keyword}: ${comments.length} comments found`);
         console.log('Extracted comments:', comments);
 
-        // Combine comments into a single paragraph
-        const combinedComments = comments.join(' ');
-        console.log('Combined comments:', combinedComments);
+        // Send all comments in a single request to the Flask server
+        console.log('Sending comments to Flask server:', { comments });
+        const pyResponse = await axios.post(flaskUrl, { comments });
 
-        // Send combined comments to the Python server for predictions
-        const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
-        const prediction = pyResponse.data.prediction;
+        if (!pyResponse.data.predictions) {
+            console.log("No valid predictions obtained.");
+            return res.status(500).json({ error: 'No valid predictions obtained' });
+        }
 
-        console.log('Received prediction:', prediction);
+        // Calculate average prediction and determine sentiment
+        const predictions = pyResponse.data.predictions;
+        const averagePrediction = predictions.reduce((a, b) => a + b, 0) / predictions.length;
+        const averageSentiment = averagePrediction > 0.5 ? 'Positive' : 'Negative';
 
-        return res.json({ keyword, prediction });
+        console.log('Average prediction:', averagePrediction);
+        console.log('Average sentiment:', averageSentiment);
+        console.log('Most frequent word:', pyResponse.data.most_frequent_words);
+
+        return res.json({
+            keyword,
+            prediction: averagePrediction,
+            sentiment: averageSentiment,
+            mostFrequentWord: pyResponse.data.most_frequent_words
+        });
     } catch (error) {
         console.error("Error communicating with Elasticsearch or Python server:", error);
         return res.status(500).json({ error: 'Error processing the request' });
     }
 });
+
+
 
 router.get('/analyze/:videoId/commentsBefore/:date', async (req, res) => {
     try {
@@ -354,20 +376,42 @@ router.get('/analyze/:videoId/commentsBefore/:date', async (req, res) => {
 
         if (response.found) {
             const comments = response._source.comments.filter(comment => 
+                comment.snippet &&
+                comment.snippet.topLevelComment &&
                 new Date(comment.snippet.topLevelComment.snippet.publishedAt) < new Date(formattedDate)
-            );
+            ).map(comment => comment.snippet.topLevelComment.snippet.textDisplay);
 
             comments.forEach(comment => {
-                console.log("Comment Date:", comment.snippet.topLevelComment.snippet.publishedAt);
+                if (comment.snippet && comment.snippet.topLevelComment) {
+                    console.log("Comment Date:", comment.snippet.topLevelComment.snippet.publishedAt);
+                }
             });
 
             if (comments.length > 0) {
-                const combinedComments = comments.map(comment => comment.snippet.topLevelComment.snippet.textDisplay).join(' ');
+                // Send all comments in a single request to the Flask server
+                console.log('Sending comments to Flask server:', { comments });
+                const pyResponse = await axios.post(flaskUrl, { comments });
 
-                const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
-                const prediction = pyResponse.data.prediction;
+                if (!pyResponse.data.predictions) {
+                    console.log("No valid predictions obtained.");
+                    return res.status(500).json({ error: 'No valid predictions obtained' });
+                }
 
-                res.json({ videoId, prediction });
+                // Calculate average prediction and determine sentiment
+                const predictions = pyResponse.data.predictions;
+                const averagePrediction = predictions.reduce((a, b) => a + b, 0) / predictions.length;
+                const averageSentiment = averagePrediction > 0.5 ? 'Positive' : 'Negative';
+
+                console.log('Average prediction:', averagePrediction);
+                console.log('Average sentiment:', averageSentiment);
+                console.log('Most frequent word:', pyResponse.data.most_frequent_words);
+
+                return res.json({
+                    videoId,
+                    prediction: averagePrediction,
+                    sentiment: averageSentiment,
+                    mostFrequentWord: pyResponse.data.most_frequent_words
+                });
             } else {
                 res.status(404).json({ error: 'No comments found before this date' });
             }
@@ -379,6 +423,9 @@ router.get('/analyze/:videoId/commentsBefore/:date', async (req, res) => {
         res.status(500).json({ error: 'Error retrieving comments' });
     }
 });
+
+
+
 
 router.get('/analyze/:videoId/commentsAfter/:date', async (req, res) => {
     try {
@@ -394,20 +441,42 @@ router.get('/analyze/:videoId/commentsAfter/:date', async (req, res) => {
 
         if (response.found) {
             const comments = response._source.comments.filter(comment => 
+                comment.snippet &&
+                comment.snippet.topLevelComment &&
                 new Date(comment.snippet.topLevelComment.snippet.publishedAt) > new Date(formattedDate)
-            );
+            ).map(comment => comment.snippet.topLevelComment.snippet.textDisplay);
 
             comments.forEach(comment => {
-                console.log("Comment Date:", comment.snippet.topLevelComment.snippet.publishedAt);
+                if (comment.snippet && comment.snippet.topLevelComment) {
+                    console.log("Comment Date:", comment.snippet.topLevelComment.snippet.publishedAt);
+                }
             });
 
             if (comments.length > 0) {
-                const combinedComments = comments.map(comment => comment.snippet.topLevelComment.snippet.textDisplay).join(' ');
+                // Send all comments in a single request to the Flask server
+                console.log('Sending comments to Flask server:', { comments });
+                const pyResponse = await axios.post(flaskUrl, { comments });
 
-                const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
-                const prediction = pyResponse.data.prediction;
+                if (!pyResponse.data.predictions) {
+                    console.log("No valid predictions obtained.");
+                    return res.status(500).json({ error: 'No valid predictions obtained' });
+                }
 
-                res.json({ videoId, prediction });
+                // Calculate average prediction and determine sentiment
+                const predictions = pyResponse.data.predictions;
+                const averagePrediction = predictions.reduce((a, b) => a + b, 0) / predictions.length;
+                const averageSentiment = averagePrediction > 0.5 ? 'Positive' : 'Negative';
+
+                console.log('Average prediction:', averagePrediction);
+                console.log('Average sentiment:', averageSentiment);
+                console.log('Most frequent word:', pyResponse.data.most_frequent_words);
+
+                return res.json({
+                    videoId,
+                    prediction: averagePrediction,
+                    sentiment: averageSentiment,
+                    mostFrequentWord: pyResponse.data.most_frequent_words
+                });
             } else {
                 res.status(404).json({ error: 'No comments found after this date' });
             }
@@ -419,6 +488,8 @@ router.get('/analyze/:videoId/commentsAfter/:date', async (req, res) => {
         res.status(500).json({ error: 'Error retrieving comments' });
     }
 });
+
+
 
 router.get('/analyze/:videoId/commentsBetween/:startDate/:endDate', async (req, res) => {
     try {
@@ -438,19 +509,39 @@ router.get('/analyze/:videoId/commentsBetween/:startDate/:endDate', async (req, 
             const comments = response._source.comments.filter(comment => {
                 const commentDate = new Date(comment.snippet.topLevelComment.snippet.publishedAt);
                 return commentDate >= new Date(formattedStartDate) && commentDate <= new Date(formattedEndDate);
-            });
+            }).map(comment => comment.snippet.topLevelComment.snippet.textDisplay);
 
             comments.forEach(comment => {
-                console.log("Comment Date:", comment.snippet.topLevelComment.snippet.publishedAt);
+                if (comment.snippet && comment.snippet.topLevelComment) {
+                    console.log("Comment Date:", comment.snippet.topLevelComment.snippet.publishedAt);
+                }
             });
 
             if (comments.length > 0) {
-                const combinedComments = comments.map(comment => comment.snippet.topLevelComment.snippet.textDisplay).join(' ');
+                // Send all comments in a single request to the Flask server
+                console.log('Sending comments to Flask server:', { comments });
+                const pyResponse = await axios.post(flaskUrl, { comments });
 
-                const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
-                const prediction = pyResponse.data.prediction;
+                if (!pyResponse.data.predictions) {
+                    console.log("No valid predictions obtained.");
+                    return res.status(500).json({ error: 'No valid predictions obtained' });
+                }
 
-                res.json({ videoId, prediction });
+                // Calculate average prediction and determine sentiment
+                const predictions = pyResponse.data.predictions;
+                const averagePrediction = predictions.reduce((a, b) => a + b, 0) / predictions.length;
+                const averageSentiment = averagePrediction > 0.5 ? 'Positive' : 'Negative';
+
+                console.log('Average prediction:', averagePrediction);
+                console.log('Average sentiment:', averageSentiment);
+                console.log('Most frequent word:', pyResponse.data.most_frequent_words);
+
+                return res.json({
+                    videoId,
+                    prediction: averagePrediction,
+                    sentiment: averageSentiment,
+                    mostFrequentWord: pyResponse.data.most_frequent_words
+                });
             } else {
                 res.status(404).json({ error: 'No comments found between these dates' });
             }
@@ -462,6 +553,7 @@ router.get('/analyze/:videoId/commentsBetween/:startDate/:endDate', async (req, 
         res.status(500).json({ error: 'Error retrieving comments' });
     }
 });
+
 
 router.get('/analyze/customVideoAfter/:videoId/:date', async (req, res) => {
     try {
@@ -479,12 +571,32 @@ router.get('/analyze/customVideoAfter/:videoId/:date', async (req, res) => {
         console.log(`Comments after ${formattedDate}: ${filteredComments.length}`);
         
         if (filteredComments.length > 0) {
-            const combinedComments = filteredComments.map(comment => comment.textDisplay).join(' ');
+            const commentTexts = filteredComments.map(comment => comment.textDisplay);
 
-            const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
-            const prediction = pyResponse.data.prediction;
+            // Send all comments in a single request to the Flask server
+            console.log('Sending comments to Flask server:', commentTexts);
+            const pyResponse = await axios.post(flaskUrl, { comments: commentTexts });
 
-            res.json({ videoId, prediction });
+            if (!pyResponse.data.predictions) {
+                console.log("No valid predictions obtained.");
+                return res.status(500).json({ error: 'No valid predictions obtained' });
+            }
+
+            // Calculate average prediction and determine sentiment
+            const predictions = pyResponse.data.predictions;
+            const averagePrediction = predictions.reduce((a, b) => a + b, 0) / predictions.length;
+            const averageSentiment = averagePrediction > 0.5 ? 'Positive' : 'Negative';
+
+            console.log('Average prediction:', averagePrediction);
+            console.log('Average sentiment:', averageSentiment);
+            console.log('Most frequent word:', pyResponse.data.most_frequent_words);
+
+            return res.json({
+                videoId,
+                prediction: averagePrediction,
+                sentiment: averageSentiment,
+                mostFrequentWord: pyResponse.data.most_frequent_words
+            });
         } else {
             res.status(404).json({ error: 'No comments found after this date' });
         }
@@ -514,17 +626,38 @@ router.get('/analyze/customVideoBefore/:videoId/:date', async (req, res) => {
 
         console.log(`Fetched ${filteredComments.length} comments before ${formattedDate}`);
 
-        const combinedComments = filteredComments.map(comment => comment.textDisplay).join(' ');
+        const commentTexts = filteredComments.map(comment => comment.textDisplay);
 
-        const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
-        const prediction = pyResponse.data.prediction;
+        // Send all comments in a single request to the Flask server
+        console.log('Sending comments to Flask server:', commentTexts);
+        const pyResponse = await axios.post(flaskUrl, { comments: commentTexts });
 
-        res.json({ videoId, prediction });
+        if (!pyResponse.data.predictions) {
+            console.log("No valid predictions obtained.");
+            return res.status(500).json({ error: 'No valid predictions obtained' });
+        }
+
+        // Calculate average prediction and determine sentiment
+        const predictions = pyResponse.data.predictions;
+        const averagePrediction = predictions.reduce((a, b) => a + b, 0) / predictions.length;
+        const averageSentiment = averagePrediction > 0.5 ? 'Positive' : 'Negative';
+
+        console.log('Average prediction:', averagePrediction);
+        console.log('Average sentiment:', averageSentiment);
+        console.log('Most frequent word:', pyResponse.data.most_frequent_words);
+
+        res.json({
+            videoId,
+            prediction: averagePrediction,
+            sentiment: averageSentiment,
+            mostFrequentWord: pyResponse.data.most_frequent_words
+        });
     } catch (error) {
         console.error('Error processing the request:', error);
         res.status(500).json({ error: 'Error processing the request' });
     }
 });
+
 
 // CustomVideoBetween endpoint
 router.get('/analyze/customVideoBetween/:videoId/:startDate/:endDate', async (req, res) => {
@@ -551,17 +684,38 @@ router.get('/analyze/customVideoBetween/:videoId/:startDate/:endDate', async (re
 
         console.log(`Fetched ${filteredComments.length} comments between ${formattedStartDate} and ${formattedEndDate}`);
        
-        const combinedComments = filteredComments.map(comment => comment.textDisplay).join(' ');
+        const commentTexts = filteredComments.map(comment => comment.textDisplay);
 
-        const pyResponse = await axios.post(flaskUrl, { text: combinedComments });
-        const prediction = pyResponse.data.prediction;
+        // Send all comments in a single request to the Flask server
+        console.log('Sending comments to Flask server:', commentTexts);
+        const pyResponse = await axios.post(flaskUrl, { comments: commentTexts });
 
-        res.json({ videoId, prediction });
+        if (!pyResponse.data.predictions) {
+            console.log("No valid predictions obtained.");
+            return res.status(500).json({ error: 'No valid predictions obtained' });
+        }
+
+        // Calculate average prediction and determine sentiment
+        const predictions = pyResponse.data.predictions;
+        const averagePrediction = predictions.reduce((a, b) => a + b, 0) / predictions.length;
+        const averageSentiment = averagePrediction > 0.5 ? 'Positive' : 'Negative';
+
+        console.log('Average prediction:', averagePrediction);
+        console.log('Average sentiment:', averageSentiment);
+        console.log('Most frequent word:', pyResponse.data.most_frequent_words);
+
+        res.json({
+            videoId,
+            prediction: averagePrediction,
+            sentiment: averageSentiment,
+            mostFrequentWord: pyResponse.data.most_frequent_words
+        });
     } catch (error) {
         console.error('Error processing the request:', error);
         res.status(500).json({ error: 'Error processing the request' });
     }
 });
+
 
 function extractComments(response) {
     if (!response._source || !response._source.comments) {
